@@ -112,12 +112,19 @@ if uploaded_file is not None:
                 else:
                     fig, ax = plt.subplots(figsize=(12, 7))
                     
+                    # --- MODIFIED/CONFIRMED SECTION ---
                     if col1 in categorical_cols and col2 in categorical_cols:
                         st.subheader(f"Clustered Bar Chart: {col1} vs {col2}")
+                        # Create a crosstab to get the counts for each combination
                         crosstab = pd.crosstab(data[col1], data[col2])
+                        # Plot the crosstab directly. The bar heights will be the counts.
                         crosstab.plot(kind='bar', stacked=False, ax=ax, colormap='Paired')
+                        # Set the y-axis label to 'Count'
                         ax.set_ylabel('Count')
+                        
+                        # Calculate percentages for labels based on the total number of entries
                         total = len(data)
+                        # Iterate through the bar containers to add the percentage labels
                         for container in ax.containers:
                             labels = [f'{(v.get_height() / total) * 100:.1f}%' for v in container]
                             ax.bar_label(container, labels=labels, label_type='center', color='black', fontsize=9, zorder=10)
@@ -127,7 +134,7 @@ if uploaded_file is not None:
                         num_col = col2 if col1 in categorical_cols else col1
                         st.subheader(f"Boxplot for {num_col} by {cat_col}")
                         data.boxplot(column=num_col, by=cat_col, ax=ax, patch_artist=True, boxprops=dict(facecolor='#D2B48C'))
-                        plt.suptitle('')
+                        plt.suptitle('') # Suppress the default title
                     
                     elif col1 in numerical_cols and col2 in numerical_cols:
                         st.subheader(f"Scatter Plot: {col1} vs {col2}")
@@ -155,7 +162,6 @@ if uploaded_file is not None:
 # --- Handle Chatbot Interaction in Sidebar ---
 if 'data' in st.session_state:
     
-    # --- MODIFIED SECTION ---
     st.sidebar.markdown("---")
     ai_mode = st.sidebar.radio("What would you like the AI to do?", 
                                ("Answer a question", "Generate a visualization"), 
@@ -169,6 +175,7 @@ if 'data' in st.session_state:
         else:
             try:
                 data = st.session_state.data
+                # For large datasets, send summary stats. For smaller ones, send the whole CSV.
                 data_desc = "Data summary:\n" + data.describe(include='all').to_csv() if len(data) > 100 else data.to_csv()
 
                 # Select the prompt based on the chosen AI mode
@@ -221,9 +228,11 @@ if st.session_state.ai_responses:
         
         if content.get('code'):
             try:
+                # Prepare a namespace for the exec function
                 namespace = {'data': st.session_state.data, 'pd': pd, 'plt': plt, 'np': np, 'fig': None, 'ax': None, 'df': None}
                 exec(content['code'], namespace)
 
+                # Check for generated plot or dataframe and display them
                 if namespace.get('fig') is not None:
                     st.pyplot(namespace['fig'])
                 if namespace.get('df') is not None:
