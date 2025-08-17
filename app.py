@@ -6,6 +6,7 @@ import itertools
 from io import BytesIO
 import requests
 import json
+import seaborn as sns
 
 # For ODT support, requires odfpy library
 try:
