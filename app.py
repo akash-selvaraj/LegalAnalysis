@@ -86,17 +86,27 @@ if uploaded_file is not None:
             selected_col = st.selectbox("Select a Column", all_cols)
             if st.button("Generate Graph"):
                 fig, ax = plt.subplots(figsize=(10, 6))
+                st.subheader(f"Bar Chart for {selected_col}")
+
                 if selected_col in categorical_cols:
-                    st.subheader(f"Distribution for {selected_col}")
-                    vc_norm = data[selected_col].value_counts(normalize=True).mul(100)
-                    bars = ax.bar(vc_norm.index, vc_norm.values, color='#87CEEB')
-                    ax.set_ylabel('Percent (%)')
-                    ax.set_ylim(0, 100)
-                    ax.bar_label(bars, fmt='%.1f%%', label_type='center', color='black')
-                else: # Numerical
-                    st.subheader(f"Histogram for {selected_col}")
-                    ax.hist(data[selected_col].dropna(), bins=20, color='#90EE90')
-                    ax.set_ylabel('Frequency')
+                    vc = data[selected_col].value_counts()
+                    bars = ax.bar(vc.index, vc.values, color='#87CEEB')
+                    ax.set_ylabel('Count')
+                else: # Numerical - bin first, then bar chart
+                    # Bin the numerical data into intervals
+                    binned_data = pd.cut(data[selected_col], bins=10)
+                    vc = binned_data.value_counts().sort_index()
+                    # Convert interval index to string for plotting
+                    vc.index = vc.index.astype(str)
+                    bars = ax.bar(vc.index, vc.values, color='#90EE90')
+                    ax.set_ylabel('Count (Frequency)')
+                
+                # Calculate percentages for labels
+                total = vc.sum()
+                if total > 0:
+                    labels = [f'{(v.get_height() / total) * 100:.1f}%' for v in bars]
+                    ax.bar_label(bars, labels=labels, label_type='center', color='black')
+
                 ax.set_xlabel(selected_col)
                 plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
                 fig.tight_layout()
@@ -111,36 +121,28 @@ if uploaded_file is not None:
                     st.warning("Please select two different columns.")
                 else:
                     fig, ax = plt.subplots(figsize=(12, 7))
+                    st.subheader(f"Clustered Bar Chart: {col1} vs {col2}")
+
+                    # Use a copy for plotting to avoid changing original data
+                    plot_data = data.copy()
+
+                    # Bin any numerical columns to treat them as categorical
+                    if col1 in numerical_cols:
+                        plot_data[col1] = pd.cut(plot_data[col1], bins=5, labels=[f"Bin {i+1}" for i in range(5)])
+                    if col2 in numerical_cols:
+                        plot_data[col2] = pd.cut(plot_data[col2], bins=5, labels=[f"Bin {i+1}" for i in range(5)])
+
+                    # Now, create a crosstab and plot a clustered bar chart for any combination
+                    crosstab = pd.crosstab(plot_data[col1], plot_data[col2])
+                    crosstab.plot(kind='bar', stacked=False, ax=ax, colormap='Paired')
+                    ax.set_ylabel('Count')
                     
-                    # --- MODIFIED/CONFIRMED SECTION ---
-                    if col1 in categorical_cols and col2 in categorical_cols:
-                        st.subheader(f"Clustered Bar Chart: {col1} vs {col2}")
-                        # Create a crosstab to get the counts for each combination
-                        crosstab = pd.crosstab(data[col1], data[col2])
-                        # Plot the crosstab directly. The bar heights will be the counts.
-                        crosstab.plot(kind='bar', stacked=False, ax=ax, colormap='Paired')
-                        # Set the y-axis label to 'Count'
-                        ax.set_ylabel('Count')
-                        
-                        # Calculate percentages for labels based on the total number of entries
-                        total = len(data)
-                        # Iterate through the bar containers to add the percentage labels
+                    # Calculate percentages for labels based on the total number of entries
+                    total = len(data)
+                    if total > 0:
                         for container in ax.containers:
                             labels = [f'{(v.get_height() / total) * 100:.1f}%' for v in container]
                             ax.bar_label(container, labels=labels, label_type='center', color='black', fontsize=9, zorder=10)
-
-                    elif (col1 in categorical_cols and col2 in numerical_cols) or (col1 in numerical_cols and col2 in categorical_cols):
-                        cat_col = col1 if col1 in categorical_cols else col2
-                        num_col = col2 if col1 in categorical_cols else col1
-                        st.subheader(f"Boxplot for {num_col} by {cat_col}")
-                        data.boxplot(column=num_col, by=cat_col, ax=ax, patch_artist=True, boxprops=dict(facecolor='#D2B48C'))
-                        plt.suptitle('') # Suppress the default title
-                    
-                    elif col1 in numerical_cols and col2 in numerical_cols:
-                        st.subheader(f"Scatter Plot: {col1} vs {col2}")
-                        ax.scatter(data[col1], data[col2], alpha=0.7, color='purple')
-                        ax.set_xlabel(col1)
-                        ax.set_ylabel(col2)
 
                     plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
                     fig.tight_layout()
